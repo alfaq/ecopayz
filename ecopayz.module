@@ -1,0 +1,225 @@
+<?php
+
+/**
+ * @file
+ * myblock.module
+ */ 
+ 
+/**
+ * Implements hook_menu().
+ */
+function ecopayz_menu(){
+	//admin
+  $items['admin/config/ecopayz'] = array(
+    'title' => 'Configuration ecopayz page',
+    'page callback' => 'config_ecopayz',
+    'access arguments' => array('ecopayz config page'),
+  );
+  
+  $items['admin/config/ecopayz-info'] = array(
+    'title' => 'Info ecopayz page',
+    'access arguments' => array('ecopayz info'),
+  );
+
+  $items['deposit-funds/ecopayz-card-payment'] = array(
+    'title' => 'EcoPayz Card Payment',
+    'page callback' => 'ecopayz_view',
+    'access callback' => TRUE,
+    'menu_name' => 'main-menu',
+  );
+  
+  return $items;
+}
+
+function ecopayz_admin_menu_output_alter(&$content) {
+	$content['menu']['admin/content']['admin/content/ecopayz-info'] = array(
+		'#title' => t('Ecopayz info'),
+		'#href' => 'admin/content/ecopayz-info',
+		'#weight' => 3,
+	);
+}
+
+//admin
+function ecopayz_permission() {
+    return array(
+        'ecopayz config page' => array(
+            'title' => t('ecopayz config page'),
+            'description' => t('config page.'),
+        ),
+		'ecopayz info' => array(
+            'title' => t('ecopayz info'),
+            'description' => t('info page.'),
+        ),
+    );
+}
+
+//admin
+function config_ecopayz() {
+	return drupal_get_form('ecopayz_admin_form');
+}
+
+//admin
+function ecopayz_admin_form($form, &$form_state) {
+	$form = array();
+	
+	/*$TxID = 1113;
+	$TxBatchNumber = 1;
+	$CustomerIdAtMerchant = '';
+	$MerchantFreeText = '';*/
+	
+	$form['url_ecopayz'] = array(
+		'#type' => 'textfield',
+		'#title' => t('Url ecopayz'),
+		'#size' => 60,
+		'#maxlength' => 250,
+		'#default_value' => variable_get('url_ecopayz', 'https://secure.test.ecopayz.com/PrivateArea/WithdrawOnlineTransfer.aspx'),
+		'#description' => 'For test environment: https://secure.test.ecopayz.com/PrivateArea/WithdrawOnlineTransfer.aspx<br />
+		For live environment: https://secure.ecopayz.com/PrivateArea/WithdrawOnlineTransfer.aspx'
+	);
+	
+	$form['paymentpageid'] = array(
+		'#type' => 'textfield',
+		'#title' => t('PaymentPageID'),
+		'#size' => 60,
+		'#maxlength' => 250,
+		'#default_value' => variable_get('paymentpageid', '1948'),
+	);
+	
+	$form['merchantaccountnumber'] = array(
+		'#type' => 'textfield',
+		'#title' => t('MerchantAccountNumber USD'),
+		'#size' => 60,
+		'#maxlength' => 250,
+		'#default_value' => variable_get('merchantaccountnumber', '110578'),
+	);
+	
+	$form['merchantaccountnumbereur'] = array(
+		'#type' => 'textfield',
+		'#title' => t('MerchantAccountNumber EUR'),
+		'#size' => 60,
+		'#maxlength' => 250,
+		'#default_value' => variable_get('merchantaccountnumbereur', '110578'),
+	);
+	
+	$form['merchantpassword'] = array(
+		'#type' => 'textfield',
+		'#title' => t('Merchant password'),
+		'#size' => 60,
+		'#maxlength' => 250,
+		'#default_value' => variable_get('merchantpassword', ''),
+	);
+
+	$form['submit'] = array(
+	  '#type' => 'submit',
+	  '#value' => t('Save'),
+	);
+	
+	$form['cancel'] = array(
+        '#type' => 'button',
+        '#value' => t('Cancel'),
+        '#prefix' => '&nbsp; &nbsp; &nbsp;',
+        '#attributes' => array('onClick' => 'history.go(-1); return true;'),
+        '#post_render' => array('change_button_type'),
+    );
+	
+  return $form;
+}
+
+
+//admin
+function ecopayz_admin_form_submit($form, &$form_state) {
+	variable_set('url_ecopayz', $form_state['values']['url_ecopayz']);
+	variable_set('paymentpageid', $form_state['values']['paymentpageid']);
+	variable_set('merchantaccountnumber', $form_state['values']['merchantaccountnumber']);
+	variable_set('merchantaccountnumbereur', $form_state['values']['merchantaccountnumbereur']);
+	variable_set('merchantpassword', $form_state['values']['merchantpassword']);
+}
+
+
+function ecopayz_form($form, &$form_state) {
+	$form = array();
+	$form['Amount'] = array(
+		'#type' => 'textfield',
+		'#title' => t('Amount'),
+		'#size' => 20,
+		'#maxlength' => 250,
+		'#required' => TRUE,
+	);
+	$form['Currency'] = array(
+       '#type' => 'select',
+       '#title' => t('Currency'),
+	   '#title_display' => 'invisible',
+       '#options' => array(
+			'USD' => t('USD'),
+			'EUR' => t('EUR'),
+       ),
+	);
+	$form['submit'] = array(
+	  '#type' => 'submit',
+	  '#value' => t('Submit'),
+	);
+	
+	//$form['#action'] = 'https://secure.test.ecopayz.com/PrivateArea/WithdrawOnlineTransfer.aspx';
+	//$form['#after_build'][] = 'ecopayz_form_modify';
+  return $form;
+}
+/*
+function ecopayz_form_modify($form){
+  unset($form['form_token']);
+  unset($form['form_build_id']);
+  unset($form['form_id']);
+  return $form;
+}*/
+
+function ecopayz_form_submit($form, &$form_state) {
+	$options = array();
+	//get
+	if($form_state['values']['Currency'] == 'USD'){
+		$options = array(
+			'TxID' => time(),
+			'TxBatchNumber' => 1,
+			'Amount' => $form_state['values']['Amount'],
+			'Currency' => $form_state['values']['Currency'],
+			'MerchantFreeText' => '',
+			'MerchantAccountNumber' => variable_get('merchantaccountnumber', ''),
+			'CustomerIdAtMerchant' => '',
+			'PaymentPageID' => variable_get('paymentpageid', ''),
+		);
+	}else{
+		$options = array(
+			'TxID' => time(),
+			'TxBatchNumber' => 1,
+			'Amount' => $form_state['values']['Amount'],
+			'Currency' => $form_state['values']['Currency'],
+			'MerchantFreeText' => '',
+			'MerchantAccountNumber' => variable_get('merchantaccountnumbereur', ''),
+			'CustomerIdAtMerchant' => '',
+			'PaymentPageID' => variable_get('paymentpageid', ''),
+		);
+	}
+	$merchantpassword = variable_get('merchantpassword', '');
+	
+	$Checksum = md5($options['PaymentPageID'].$options['MerchantAccountNumber'].$options['CustomerIdAtMerchant'].$options['TxID'].$options['TxBatchNumber'].$options['Amount'].$options['Currency'].$options['MerchantFreeText'].$merchantpassword);
+	
+	$options += array('Checksum' => $Checksum);
+	
+    $options = http_build_query($options);
+
+    $url = variable_get('url_ecopayz', ''); 
+	if(!empty($url)){
+		//drupal_goto($url, $options);
+		$form_state['redirect'] = $url.'?'.$options;
+	}else{
+		drupal_set_message(t("Empty url in admin settings"), 'error');
+	}
+}
+
+
+
+function ecopayz_view() {
+	$path = drupal_get_path('module', 'ecopayz');
+	$page = '<div class="div-global-payment"><img src="/'.$path.'/logo_ecopayz.gif" /> <span class="global-payment">Global payments, safe and easy</span></div>';
+	$form = drupal_get_form('ecopayz_form');
+	$page .= render($form);
+    return $page;
+}
